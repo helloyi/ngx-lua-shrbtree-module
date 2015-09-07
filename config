@@ -1,0 +1,17 @@
+if echo $HTTP_MODULES | grep " ngx_http_lua_module" > /dev/null; then
+    echo "found ngx_http_lua_module for ngx_http_lua_rbtree; looks good."
+else
+    echo "error: ngx_http_lua_module is required to build ngx_http_lua_rbtree;\
+         please put it before ngx_http_lua_rbtree." 1>&2
+    exit 1
+fi
+
+ngx_addon_name=ngx_http_lua_shrbtree_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_lua_shrbtree_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
+                $ngx_addon_dir/src/ngx_http_lua_shrbtree_module.c \
+                $ngx_addon_dir/src/ngx_http_lua_shrbtree_lapi.c"
+
+NGX_ADDON_DEPS="$NGX_ADDN_DEPS \
+                $ngx_addon_dir/src/ngx_http_lua_shrbtree_common.h \
+                $ngx_addon_dir/src/ngx_http_lua_shrbtree_lapi.h"
