@@ -37,51 +37,39 @@ static int ngx_http_lua_shrbtree_insert(lua_State *L);
 static int ngx_http_lua_shrbtree_get(lua_State *L);
 static int ngx_http_lua_shrbtree_delete(lua_State *L);
 
-
 static void ngx_http_lua_shrbtree_pushlvalue(lua_State *L, u_char *data,
-                                             u_char type, size_t len);
+    u_char type, size_t len);
 static void ngx_http_lua_shrbtree_pushltable(lua_State *L,
-                                             ngx_http_lua_shrbtree_ltable_t
-                                             *ltable);
+    ngx_http_lua_shrbtree_ltable_t *ltable);
 static void ngx_http_lua_shrbtree_pushlfield(lua_State *L,
-                                             ngx_rbtree_node_t *node,
-                                             ngx_rbtree_node_t *sentinel);
-
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
 static ngx_int_t ngx_http_lua_shrbtree_tolvalue(lua_State *L, int index,
-                                                u_char **data, u_char *type,
-                                                size_t *len);
+    u_char **data, u_char *type, size_t *len);
 static ngx_int_t ngx_http_lua_shrbtree_toltable(lua_State *L, int index,
-                                                ngx_http_lua_shrbtree_ltable_t
-                                                *ltable);
-
+    ngx_http_lua_shrbtree_ltable_t *ltable);
 
 static ngx_rbtree_node_t *ngx_http_lua_shrbtree_get_node(lua_State *L,
-                                                         ngx_rbtree_t *rbtree);
+    ngx_rbtree_t *rbtree);
 static ngx_rbtree_node_t *ngx_http_lua_shrbtree_get_rawnode(lua_State *L,
-                                                           ngx_rbtree_t *rbtree,
-                                                           ngx_rbtree_node_t
-                                                           **parent,
-                                                           ngx_rbtree_node_t
-                                                           ***position);
+    ngx_rbtree_t *rbtree, ngx_rbtree_node_t **parent,
+    ngx_rbtree_node_t ***position);
 
-static ngx_http_lua_shrbtree_lfield_t *ngx_http_lua_shrbtree_get_lfield
-(ngx_http_lua_shrbtree_ltable_t *ltable, void *kdata, size_t klen);
+static ngx_http_lua_shrbtree_lfield_t *ngx_http_lua_shrbtree_get_lfield(
+    ngx_http_lua_shrbtree_ltable_t *ltable, void *kdata, size_t klen);
 
 static void ngx_http_lua_shrbtree_rdestroy_lfield(ngx_slab_pool_t *shpool,
-                                                  ngx_rbtree_node_t *root,
-                                                  ngx_rbtree_node_t *sentinel);
+    ngx_rbtree_node_t *root, ngx_rbtree_node_t *sentinel);
 static void ngx_http_lua_shrbtree_destroy_ltable(ngx_slab_pool_t *shpool,
-                                                 ngx_http_lua_shrbtree_ltable_t
-                                                 *ltable);
+    ngx_http_lua_shrbtree_ltable_t *ltable);
 
 static int ngx_http_lua_shrbtree_luaL_checknarg(lua_State *L, int narg);
 static ngx_shm_zone_t *ngx_http_lua_shrbtree_luaL_checkzone(lua_State *L,
-                                                            int arg);
+    int arg);
+static ngx_cycle_t *ngx_http_lua_shrbtree_luaL_checkcycle(lua_State *L);
 
 static void ngx_http_lua_shrbtree_insert_value(ngx_rbtree_node_t *node1,
-                                               ngx_rbtree_node_t *node2,
-                                               ngx_rbtree_node_t *sentinel);
+    ngx_rbtree_node_t *node2, ngx_rbtree_node_t *sentinel);
 
 #define NGX_HTTP_LUA_SHRBTREE_LVALUE_SIZE sizeof(ngx_http_lua_shrbtree_lvalue_t)
 
@@ -144,17 +132,13 @@ int
 ngx_http_lua_shrbtree_preload(lua_State *L)
 {
     ngx_http_lua_shrbtree_main_conf_t *lsmcf;
-    ngx_http_conf_ctx_t  *hmcf_ctx;
     ngx_cycle_t *cycle;
 
     ngx_http_lua_shrbtree_ctx_t  *ctx;
     ngx_uint_t                   i;
     ngx_shm_zone_t               **zone;
 
-    lua_getglobal(L, "__ngx_cycle");
-    cycle = lua_touserdata(L, -1);
-    lua_pop(L, 1);
-
+    cycle = ngx_http_lua_shrbtree_luaL_checkcycle(L);
     lsmcf = ngx_http_lua_shrbtree_get_main_conf(cycle);
 
     if (lsmcf->shm_zones != NULL) {
@@ -200,6 +184,24 @@ ngx_http_lua_shrbtree_preload(lua_State *L)
 }
 
 
+static ngx_cycle_t *
+ngx_http_lua_shrbtree_luaL_checkcycle(lua_State *L)
+{
+    ngx_cycle_t *cycle;
+
+    lua_getglobal(L, "__ngx_cycle");
+    cycle = lua_touserdata(L, -1);
+    if (cycle == NULL) {
+        luaL_error(L, "attempt to use a 'ngx.null' value "
+                   "(global '__ngx_cycle')");
+    }
+
+    lua_pop(L, 1);
+
+    return cycle;
+}
+
+
 static int
 ngx_http_lua_shrbtree_luaL_checknarg(lua_State *L, int narg)
 {
@@ -220,6 +222,7 @@ ngx_http_lua_shrbtree_luaL_checknarg(lua_State *L, int narg)
                       ar.name);
 }
 
+
 static ngx_shm_zone_t*
 ngx_http_lua_shrbtree_luaL_checkzone(lua_State *L, int arg)
 {
@@ -235,7 +238,7 @@ ngx_http_lua_shrbtree_luaL_checkzone(lua_State *L, int arg)
     return zone;
 }
 
-/* START ngx_http_lua_shrbtree api */
+
 static int
 ngx_http_lua_shrbtree_get(lua_State *L)
 {
@@ -365,13 +368,11 @@ ngx_http_lua_shrbtree_insert(lua_State *L)
     rc = ngx_http_lua_shrbtree_tolvalue(L, -1, &vdata, &vtype, &vlen);
     if (0 != rc) {return rc;}
 
-    /* start node alloc*/
     n = offsetof(ngx_rbtree_node_t, data)
       + offsetof(ngx_http_lua_shrbtree_node_t, data)
       + klen
       + vlen;
 
-    /* ngx_shmtx_lock(&ctx->shpool->mutex); */
     node = ngx_slab_alloc_locked(ctx->shpool, n);
 
     if (node == NULL) {
@@ -380,9 +381,7 @@ ngx_http_lua_shrbtree_insert(lua_State *L)
         lua_pushliteral(L, "no memory");
         return 2;
     }
-    /* end node alloc*/
 
-    /* start insert */
     srbtn = (ngx_http_lua_shrbtree_node_t *)&node->data;
 
     srbtn->ktype = ktype;
@@ -409,312 +408,6 @@ ngx_http_lua_shrbtree_insert(lua_State *L)
 
     lua_pushboolean(L, 1);
     return 1;
-}
-/* END ngx_http_lua_shrbtree api*/
-
-/* START get helper */
-static ngx_http_lua_shrbtree_lfield_t *
-ngx_http_lua_shrbtree_get_lfield(ngx_http_lua_shrbtree_ltable_t *ltable,
-                                 void *kdata, size_t klen)
-{
-    ngx_int_t                      rc;
-    ngx_rbtree_node_t              *node, *sentinel;
-    ngx_http_lua_shrbtree_lfield_t *lfield;
-    uint32_t  hash;
-
-    node = ltable->rbtree.root;
-    sentinel = ltable->rbtree.sentinel;
-    hash = ngx_crc32_short(kdata, klen);
-
-    while (node != sentinel) {
-
-        if (hash < node->key) {
-            node = node->left;
-            continue;
-        }
-
-        if (hash > node->key) {
-            node = node->right;
-            continue;
-        }
-
-        /* hash == node->key */
-        lfield = (ngx_http_lua_shrbtree_lfield_t *) &node->data;
-
-        rc = ngx_memn2cmp(kdata, &lfield->data, klen, (size_t)lfield->klen);
-
-        if (rc == 0) {
-            return lfield;
-        }
-
-        node = (rc < 0) ? node->left : node->right;
-    }
-
-    return NULL;
-}
-
-
-static ngx_rbtree_node_t*
-ngx_http_lua_shrbtree_get_node(lua_State *L, ngx_rbtree_t *rbtree)
-{
-    return ngx_http_lua_shrbtree_get_rawnode(L, rbtree, NULL, NULL);
-}
-
-
-static ngx_rbtree_node_t*
-ngx_http_lua_shrbtree_get_rawnode(lua_State *L, ngx_rbtree_t *rbtree,
-                                  ngx_rbtree_node_t **parent,
-                                  ngx_rbtree_node_t ***position)
-{
-    ngx_int_t                    rc;
-    ngx_rbtree_node_t            *node, *sentinel;
-    ngx_rbtree_node_t            **p;
-    ngx_http_lua_shrbtree_node_t *srbtn;
-    ngx_int_t cmpf_index;
-
-    p = &rbtree->root;
-    sentinel = rbtree->sentinel;
-    if (*p == sentinel) {
-        if (parent)   *parent = NULL;
-        if (position) *position = NULL;
-        return NULL;
-    }
-
-    node = *p;
-    cmpf_index = lua_objlen(L, 2);
-    for (;;) {
-        lua_rawgeti(L, 2, cmpf_index);
-        lua_rawgeti(L, 2, 1);
-        srbtn = (ngx_http_lua_shrbtree_node_t *)&node->data;
-        ngx_http_lua_shrbtree_pushlvalue(L, &srbtn->data, srbtn->ktype,
-                                         srbtn->klen);
-        lua_call(L, 2, 1);
-        /* end call cmpf of lua*/
-
-        rc = (ngx_int_t)lua_tonumber(L, -1);
-        lua_pop(L, 1);
-        if (0 > rc) {
-            p = &node->left;
-
-        } else if (0 < rc) {
-            p = &node->right;
-
-        } else {
-            if (parent)   *parent = NULL;
-            if (position) *position = NULL;
-            return node;
-        }
-
-        if (*p == sentinel) {
-            break;
-        }
-
-        node = *p;
-    }
-    if (parent)   *parent = node;
-    if (position) *position = p;
-
-    return NULL;
-}
-
-
-static void
-ngx_http_lua_shrbtree_insert_value(ngx_rbtree_node_t *node1,
-                                   ngx_rbtree_node_t *node2,
-                                   ngx_rbtree_node_t *sentinel)
-{
-    /* nothing to do, */
-    return;
-}
-
-
-static void
-ngx_http_lua_shrbtree_pushlvalue(lua_State *L, u_char *data, u_char type,
-                                 size_t len)
-{
-    switch (type) {
-    case LUA_TBOOLEAN:
-        lua_pushboolean(L, *(int *)data);
-        break;
-    case LUA_TNUMBER:
-        lua_pushnumber(L, *(lua_Number *)data);
-        break;
-    case LUA_TSTRING:
-        lua_pushlstring(L, (char *)data, len);
-        break;
-    case LUA_TTABLE:
-        ngx_http_lua_shrbtree_pushltable(L, (ngx_http_lua_shrbtree_ltable_t *)
-                                         data);
-        break;
-    default:
-        luaL_error(L, "bad type of value");
-    }
-}
-
-
-static void
-ngx_http_lua_shrbtree_pushltable(lua_State *L,
-                                 ngx_http_lua_shrbtree_ltable_t *ltable)
-{
-    ngx_rbtree_node_t *root = ltable->rbtree.root;
-    ngx_rbtree_node_t *sentinel = ltable->rbtree.sentinel;
-    lua_newtable(L);
-    ngx_http_lua_shrbtree_pushlfield(L, root, sentinel);
-}
-
-
-static void
-ngx_http_lua_shrbtree_pushlfield(lua_State *L, ngx_rbtree_node_t *node,
-                                 ngx_rbtree_node_t *sentinel)
-{
-    ngx_http_lua_shrbtree_lfield_t *lfield;
-
-    if (node == sentinel) return;
-
-    lfield = (ngx_http_lua_shrbtree_lfield_t *)&node->data;
-    ngx_http_lua_shrbtree_pushlvalue(L, &lfield->data, lfield->ktype,
-                                     lfield->klen);
-    ngx_http_lua_shrbtree_pushlvalue(L, &lfield->data + lfield->klen,
-                                     lfield->vtype, lfield->vlen);
-    lua_settable(L, -3);
-
-    ngx_http_lua_shrbtree_pushlfield(L, node->left, sentinel);
-    ngx_http_lua_shrbtree_pushlfield(L, node->right, sentinel);
-}
-/*END pushlvalue */
-
-/* START tolvalue */
-static ngx_int_t
-ngx_http_lua_shrbtree_tolvalue(lua_State *L, int index, u_char **data,
-                               u_char *type, size_t *len)
-{
-
-    ngx_http_lua_shrbtree_ltable_t *ltable;
-
-    switch (lua_type(L, index)) {
-    case LUA_TBOOLEAN:
-        *type = LUA_TBOOLEAN;
-        *(int *)(*data) = lua_toboolean(L, index);
-        *len = sizeof(int);
-        break;
-
-    case LUA_TNUMBER:
-        *type = LUA_TNUMBER;
-        *(lua_Number *)(*data) = lua_tonumber(L, index);
-        *len = sizeof(lua_Number);
-        break;
-
-    case LUA_TSTRING:
-        *type = LUA_TSTRING;
-        *data = (u_char *)lua_tolstring(L, index, len);
-        break;
-
-    case LUA_TTABLE:
-        *type = LUA_TTABLE;
-        ltable = (ngx_http_lua_shrbtree_ltable_t *)(*data);
-        ngx_rbtree_init(&ltable->rbtree, &ltable->sentinel,
-                        ngx_rbtree_insert_value);
-
-        *len = sizeof(ngx_http_lua_shrbtree_ltable_t);
-        return ngx_http_lua_shrbtree_toltable(L, index, ltable);
-
-    default:
-        return luaL_error(L, "bad type value");
-    }
-    return 0;
-}
-
-
-static ngx_int_t
-ngx_http_lua_shrbtree_toltable(lua_State *L, int index,
-                               ngx_http_lua_shrbtree_ltable_t *ltable)
-{
-    ngx_shm_zone_t              *zone;
-    ngx_http_lua_shrbtree_ctx_t *ctx;
-    ngx_rbtree_node_t           *node;
-    ngx_http_lua_shrbtree_lfield_t *lfield;
-    void *p;
-
-    u_char key[NGX_HTTP_LUA_SHRBTREE_LVALUE_SIZE];
-    u_char value[NGX_HTTP_LUA_SHRBTREE_LVALUE_SIZE];
-    u_char *kdata = &key[0];
-    u_char *vdata = &value[0];
-    int rc, n;
-    size_t klen, vlen;
-    u_char ktype, vtype;
-
-    zone = ngx_http_lua_shrbtree_luaL_checkzone(L, 1);
-    ctx = zone->data;
-
-    lua_pushnil(L);
-    if (index < 0) {
-        index -= 1;
-    }
-    while (lua_next(L, index)) {
-        rc = ngx_http_lua_shrbtree_tolvalue(L, -2, &kdata, &ktype, &klen);
-        if (0 != rc) {return rc;}
-        rc = ngx_http_lua_shrbtree_tolvalue(L, -1, &vdata, &vtype, &vlen);
-        if (0 != rc) {return rc;}
-
-        /* start alloc*/
-        n = offsetof(ngx_rbtree_node_t, data)
-          + offsetof(ngx_http_lua_shrbtree_lfield_t, data)
-          + klen
-          + vlen;
-
-        /* ngx_shmtx_lock(&ctx->shpool->mutex); */
-        node = (ngx_rbtree_node_t *)ngx_slab_alloc_locked(ctx->shpool, n);
-
-        if (node == NULL) {
-            /* ngx_shmtx_unlock(&ctx->shpool->mutex); */
-            lua_pushnil(L);
-            lua_pushliteral(L, "no memory");
-            return 2;
-        }
-        /* end alloc*/
-
-        /* start insert*/
-        /* copy data */
-        lfield = (ngx_http_lua_shrbtree_lfield_t *)&node->data;
-
-        lfield->ktype = ktype;
-        lfield->vtype = vtype;
-        lfield->klen = klen;
-        lfield->vlen = vlen;
-        p = ngx_copy(&lfield->data, kdata, klen);
-        ngx_memcpy(p, vdata, vlen);
-        node->key = ngx_crc32_short((u_char *)kdata, klen);
-        /* end copy data */
-
-        ngx_rbtree_insert(&ltable->rbtree, node);
-        /* ngx_shmtx_unlock(&ctx->shpool->mutex); */
-        /* end insert*/
-        lua_pop(L, 1);
-    }
-
-    return 0;
-}
-
-
-static void
-ngx_http_lua_shrbtree_rdestroy_lfield(ngx_slab_pool_t *shpool,
-                                      ngx_rbtree_node_t *root,
-                                      ngx_rbtree_node_t *sentinel)
-{
-    if (root == sentinel) return;
-
-    ngx_http_lua_shrbtree_rdestroy_lfield(shpool, root->left, sentinel);
-    ngx_http_lua_shrbtree_rdestroy_lfield(shpool, root->right, sentinel);
-    ngx_slab_free_locked(shpool, root);
-}
-
-
-static void
-ngx_http_lua_shrbtree_destroy_ltable(ngx_slab_pool_t *shpool,
-                                     ngx_http_lua_shrbtree_ltable_t *ltable)
-{
-    return ngx_http_lua_shrbtree_rdestroy_lfield(shpool, ltable->rbtree.root,
-                                                 ltable->rbtree.sentinel);
 }
 
 
@@ -763,4 +456,295 @@ ngx_http_lua_shrbtree_delete(lua_State *L)
 
     lua_pushboolean(L, 1);
     return 1;
+}
+
+
+static ngx_http_lua_shrbtree_lfield_t *
+ngx_http_lua_shrbtree_get_lfield(ngx_http_lua_shrbtree_ltable_t *ltable,
+    void *kdata, size_t klen)
+{
+    ngx_int_t                      rc;
+    ngx_rbtree_node_t              *node, *sentinel;
+    ngx_http_lua_shrbtree_lfield_t *lfield;
+    uint32_t  hash;
+
+    node = ltable->rbtree.root;
+    sentinel = ltable->rbtree.sentinel;
+    hash = ngx_crc32_short(kdata, klen);
+
+    while (node != sentinel) {
+
+        if (hash < node->key) {
+            node = node->left;
+            continue;
+        }
+
+        if (hash > node->key) {
+            node = node->right;
+            continue;
+        }
+
+        /* hash == node->key */
+        lfield = (ngx_http_lua_shrbtree_lfield_t *) &node->data;
+
+        rc = ngx_memn2cmp(kdata, &lfield->data, klen, (size_t)lfield->klen);
+
+        if (rc == 0) {
+            return lfield;
+        }
+
+        node = (rc < 0) ? node->left : node->right;
+    }
+
+    return NULL;
+}
+
+
+static ngx_rbtree_node_t*
+ngx_http_lua_shrbtree_get_node(lua_State *L, ngx_rbtree_t *rbtree)
+{
+    return ngx_http_lua_shrbtree_get_rawnode(L, rbtree, NULL, NULL);
+}
+
+
+static ngx_rbtree_node_t*
+ngx_http_lua_shrbtree_get_rawnode(lua_State *L, ngx_rbtree_t *rbtree,
+    ngx_rbtree_node_t **parent, ngx_rbtree_node_t ***position)
+{
+    ngx_int_t                    rc;
+    ngx_rbtree_node_t            *node, *sentinel;
+    ngx_rbtree_node_t            **p;
+    ngx_http_lua_shrbtree_node_t *srbtn;
+    ngx_int_t cmpf_index;
+
+    p = &rbtree->root;
+    sentinel = rbtree->sentinel;
+    if (*p == sentinel) {
+        if (parent)   *parent = NULL;
+        if (position) *position = NULL;
+        return NULL;
+    }
+
+    node = *p;
+    cmpf_index = lua_objlen(L, 2);
+    for (;;) {
+        lua_rawgeti(L, 2, cmpf_index);
+        lua_rawgeti(L, 2, 1);
+        srbtn = (ngx_http_lua_shrbtree_node_t *)&node->data;
+        ngx_http_lua_shrbtree_pushlvalue(L, &srbtn->data, srbtn->ktype,
+                                         srbtn->klen);
+        lua_call(L, 2, 1);
+
+        rc = (ngx_int_t)lua_tonumber(L, -1);
+        lua_pop(L, 1);
+        if (0 > rc) {
+            p = &node->left;
+
+        } else if (0 < rc) {
+            p = &node->right;
+
+        } else {
+            if (parent)   *parent = NULL;
+            if (position) *position = NULL;
+            return node;
+        }
+
+        if (*p == sentinel) {
+            break;
+        }
+
+        node = *p;
+    }
+    if (parent)   *parent = node;
+    if (position) *position = p;
+
+    return NULL;
+}
+
+
+static void
+ngx_http_lua_shrbtree_insert_value(ngx_rbtree_node_t *node1,
+    ngx_rbtree_node_t *node2, ngx_rbtree_node_t *sentinel)
+{
+    /* nothing to do, invalidate callback of ngx-rbtree */
+    return;
+}
+
+
+static void
+ngx_http_lua_shrbtree_pushlvalue(lua_State *L, u_char *data, u_char type,
+    size_t len)
+{
+    switch (type) {
+    case LUA_TBOOLEAN:
+        lua_pushboolean(L, *(int *)data);
+        break;
+    case LUA_TNUMBER:
+        lua_pushnumber(L, *(lua_Number *)data);
+        break;
+    case LUA_TSTRING:
+        lua_pushlstring(L, (char *)data, len);
+        break;
+    case LUA_TTABLE:
+        ngx_http_lua_shrbtree_pushltable(L, (ngx_http_lua_shrbtree_ltable_t *)
+                                         data);
+        break;
+    default:
+        luaL_error(L, "bad type of value");
+    }
+}
+
+
+static void
+ngx_http_lua_shrbtree_pushltable(lua_State *L,
+    ngx_http_lua_shrbtree_ltable_t *ltable)
+{
+    ngx_rbtree_node_t *root = ltable->rbtree.root;
+    ngx_rbtree_node_t *sentinel = ltable->rbtree.sentinel;
+    lua_newtable(L);
+    ngx_http_lua_shrbtree_pushlfield(L, root, sentinel);
+}
+
+
+static void
+ngx_http_lua_shrbtree_pushlfield(lua_State *L, ngx_rbtree_node_t *node,
+    ngx_rbtree_node_t *sentinel)
+{
+    ngx_http_lua_shrbtree_lfield_t *lfield;
+
+    if (node == sentinel) return;
+
+    lfield = (ngx_http_lua_shrbtree_lfield_t *)&node->data;
+    ngx_http_lua_shrbtree_pushlvalue(L, &lfield->data, lfield->ktype,
+                                     lfield->klen);
+    ngx_http_lua_shrbtree_pushlvalue(L, &lfield->data + lfield->klen,
+                                     lfield->vtype, lfield->vlen);
+    lua_settable(L, -3);
+
+    ngx_http_lua_shrbtree_pushlfield(L, node->left, sentinel);
+    ngx_http_lua_shrbtree_pushlfield(L, node->right, sentinel);
+}
+
+
+static ngx_int_t
+ngx_http_lua_shrbtree_tolvalue(lua_State *L, int index, u_char **data,
+    u_char *type, size_t *len)
+{
+
+    ngx_http_lua_shrbtree_ltable_t *ltable;
+
+    switch (lua_type(L, index)) {
+    case LUA_TBOOLEAN:
+        *type = LUA_TBOOLEAN;
+        *(int *)(*data) = lua_toboolean(L, index);
+        *len = sizeof(int);
+        break;
+
+    case LUA_TNUMBER:
+        *type = LUA_TNUMBER;
+        *(lua_Number *)(*data) = lua_tonumber(L, index);
+        *len = sizeof(lua_Number);
+        break;
+
+    case LUA_TSTRING:
+        *type = LUA_TSTRING;
+        *data = (u_char *)lua_tolstring(L, index, len);
+        break;
+
+    case LUA_TTABLE:
+        *type = LUA_TTABLE;
+        ltable = (ngx_http_lua_shrbtree_ltable_t *)(*data);
+        ngx_rbtree_init(&ltable->rbtree, &ltable->sentinel,
+                        ngx_rbtree_insert_value);
+
+        *len = sizeof(ngx_http_lua_shrbtree_ltable_t);
+        return ngx_http_lua_shrbtree_toltable(L, index, ltable);
+
+    default:
+        return luaL_error(L, "bad type value");
+    }
+    return 0;
+}
+
+
+static ngx_int_t
+ngx_http_lua_shrbtree_toltable(lua_State *L, int index,
+    ngx_http_lua_shrbtree_ltable_t *ltable)
+{
+    ngx_shm_zone_t              *zone;
+    ngx_http_lua_shrbtree_ctx_t *ctx;
+    ngx_rbtree_node_t           *node;
+    ngx_http_lua_shrbtree_lfield_t *lfield;
+    void *p;
+
+    u_char key[NGX_HTTP_LUA_SHRBTREE_LVALUE_SIZE];
+    u_char value[NGX_HTTP_LUA_SHRBTREE_LVALUE_SIZE];
+    u_char *kdata = &key[0];
+    u_char *vdata = &value[0];
+    int rc, n;
+    size_t klen, vlen;
+    u_char ktype, vtype;
+
+    zone = ngx_http_lua_shrbtree_luaL_checkzone(L, 1);
+    ctx = zone->data;
+
+    lua_pushnil(L);
+    if (index < 0) {
+        index -= 1;
+    }
+    while (lua_next(L, index)) {
+        rc = ngx_http_lua_shrbtree_tolvalue(L, -2, &kdata, &ktype, &klen);
+        if (0 != rc) {return rc;}
+        rc = ngx_http_lua_shrbtree_tolvalue(L, -1, &vdata, &vtype, &vlen);
+        if (0 != rc) {return rc;}
+
+        n = offsetof(ngx_rbtree_node_t, data)
+          + offsetof(ngx_http_lua_shrbtree_lfield_t, data)
+          + klen
+          + vlen;
+
+        node = (ngx_rbtree_node_t *)ngx_slab_alloc_locked(ctx->shpool, n);
+
+        if (node == NULL) {
+            lua_pushnil(L);
+            lua_pushliteral(L, "no memory");
+            return 2;
+        }
+
+        lfield = (ngx_http_lua_shrbtree_lfield_t *)&node->data;
+
+        lfield->ktype = ktype;
+        lfield->vtype = vtype;
+        lfield->klen = klen;
+        lfield->vlen = vlen;
+        p = ngx_copy(&lfield->data, kdata, klen);
+        ngx_memcpy(p, vdata, vlen);
+        node->key = ngx_crc32_short((u_char *)kdata, klen);
+
+        ngx_rbtree_insert(&ltable->rbtree, node);
+        lua_pop(L, 1);
+    }
+
+    return 0;
+}
+
+
+static void
+ngx_http_lua_shrbtree_rdestroy_lfield(ngx_slab_pool_t *shpool,
+    ngx_rbtree_node_t *root, ngx_rbtree_node_t *sentinel)
+{
+    if (root == sentinel) return;
+
+    ngx_http_lua_shrbtree_rdestroy_lfield(shpool, root->left, sentinel);
+    ngx_http_lua_shrbtree_rdestroy_lfield(shpool, root->right, sentinel);
+    ngx_slab_free_locked(shpool, root);
+}
+
+
+static void
+ngx_http_lua_shrbtree_destroy_ltable(ngx_slab_pool_t *shpool,
+    ngx_http_lua_shrbtree_ltable_t *ltable)
+{
+    return ngx_http_lua_shrbtree_rdestroy_lfield(shpool, ltable->rbtree.root,
+                                                 ltable->rbtree.sentinel);
 }

@@ -13,7 +13,7 @@
 static void *ngx_http_lua_shrbtree_create_main_conf(ngx_conf_t *cf);
 static ngx_int_t ngx_http_lua_shrbtree_init(ngx_conf_t *cf);
 static char *ngx_http_lua_shared_rbtree(ngx_conf_t *cf, ngx_command_t *cmd,
-                                        void *conf);
+    void *conf);
 
 
 static ngx_command_t ngx_http_lua_shrbtree_cmds[] = {
@@ -88,7 +88,7 @@ static ngx_int_t
 ngx_http_lua_shrbtree_init(ngx_conf_t *cf)
 {
     ngx_http_lua_add_package_preload(cf, "shrbtree",
-                                     ngx_http_lua_shrbtree_preload);
+        ngx_http_lua_shrbtree_preload);
     return NGX_OK;
 }
 
