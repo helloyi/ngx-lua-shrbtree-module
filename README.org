@@ -2,7 +2,7 @@
 ngx_lua_shrbtree - Shared rbtree of ngx_lua in `workers`
 
 * Introduction
-ngx_lua_shrbtree is based on [[https://github.com/openresty/lua-nginx][lua-nginx-module]], and looks like [[https://github.com/openresty/lua-nginx-module#ngxshareddict][ngx.shared.DICT]].
+ngx_lua_shrbtree is based on [[https://github.com/openresty/lua-nginx-module][lua-nginx-module]], and looks like [[https://github.com/openresty/lua-nginx-module#ngxshareddict][ngx.shared.DICT]].
 There are differences:
 + ngx_lua_shrbtree support /lua table/,
 + there are no expiration time, replacement strategy.
@@ -89,7 +89,9 @@ make && make install
 
 ** compare_function
 Convention of the compare function:
+
 *syntax:* =result = compare_function(key1, key2)=
+
 + =key1=: Key of current rbtree node that is =key= argument of APIs.
 + =key2=: Key of other rbtree node that is given by APIs.
 + =result=: It indicates =key1 > key2= that is =1=.
