@@ -2,7 +2,7 @@
 ngx_lua_shrbtree - Shared rbtree of ngx_lua in `workers`
 
 * Introduction
-ngx_lua_shrbtree is based on lua-nginx-module, and looks like ngx.shared.DICT.
+ngx_lua_shrbtree is based on [[https://github.com/openresty/lua-nginx][lua-nginx-module]], and looks like [[https://github.com/openresty/lua-nginx-module#ngxshareddict][ngx.shared.DICT]].
 There are differences:
 + ngx_lua_shrbtree support /lua table/,
 + there are no expiration time, replacement strategy.
@@ -94,7 +94,7 @@ Convention of the compare function:
 + =key2=: Key of other rbtree node that is given by APIs.
 + =result=: It indicates =key1 > key2= that is =1=.
             It indicates =key1 < key2= that is =-1=.
-            It indicates =key1 == key2= that is =0=.
+            It indicates =key1= == =key2= that is =0=.
 
 * Example
 
@@ -139,6 +139,8 @@ http {
 }
 #+END_SRC
 
+---------------------------------------------------------------
+
 Here is a example that /ip2location/ info test:
 #+BEGIN_SRC nginx
 http {
@@ -155,6 +157,7 @@ http {
 }
 #+END_SRC
 
+insert_ipinfo.lua:
 #+BEGIN_SRC lua
 local shrbtree = require("shrbtree")
 local rbtree = shrbtree.rbtree
@@ -192,6 +195,7 @@ end
 ngx.say("ok")
 #+END_SRC
 
+get_ipinfo.lua:
 #+BEGIN_SRC lua
 local shrbtree = require("shrbtree")
 local rbtree = shrbtree.rbtree
@@ -227,6 +231,7 @@ end
 ngx.say("ok")
 #+END_SRC
 
+IP2LOCATION-LITE-DB1.CSV:
 #+BEGIN_SRC shell
 $ head IP2LOCATION-LITE-DB1.CSV
 "0","16777215","-","-"
