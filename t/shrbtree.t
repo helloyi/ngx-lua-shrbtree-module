@@ -68,6 +68,8 @@ GET /test
 --- no_error_log
 [error]
 
+
+
 === TEST 2: string key, float-point value
 --- http_config
     lua_shared_rbtree rbtree 1m;
@@ -118,6 +120,8 @@ GET /test
 --- no_error_log
 [error]
 
+
+
 === TEST 3: number key, string value
 --- http_config
     lua_shared_rbtree rbtree 1m;
@@ -167,9 +171,10 @@ ss string
 sss string
 ssss string
 sssss string
-
 --- no_error_log
 [error]
+
+
 
 === TEST 4: table key, number/string value
 --- http_config
@@ -244,6 +249,8 @@ gnirts string
 nil nil
 --- no_error_log
 [error]
+
+
 
 === TEST 5: number key, table value
 --- http_config
@@ -325,6 +332,8 @@ true boolean
 --- no_error_log
 [error]
 
+
+
 === TEST 6: table key, table value
 --- http_config
     lua_shared_rbtree rbtree 1m;
@@ -405,6 +414,8 @@ v3 string
 --- no_error_log
 [error]
 
+
+
 === TEST 7: multi shrbtree
 --- http_config
     lua_shared_rbtree rbtree1 1m;
@@ -459,6 +470,8 @@ GET /test
 --- no_error_log
 [error]
 
+
+
 === TEST 8: manay nodes
 --- http_config
     lua_shared_rbtree rbtree 10m;
@@ -510,6 +523,8 @@ GET /test
 ok
 --- no_error_log
 [error]
+
+
 
 === TEST 9: "shared dict" and "shared shrbtree" conflict test
 --- http_config
@@ -569,6 +584,8 @@ GET /test
 10 number
 --- no_error_log
 [error]
+
+
 
 === TEST 10: delete function
 --- http_config
@@ -642,6 +659,8 @@ nil nil
 ok
 --- no_error_log
 [error]
+
+
 
 === TEST 11: delete table type node
 --- http_config
