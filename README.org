@@ -1,0 +1,237 @@
+* Name
+ngx_lua_shrbtree - Shared rbtree of ngx_lua in `workers`
+
+* Introduction
+ngx_lua_shrbtree is based on lua-nginx-module, and looks like ngx.shared.DICT.
+There are differences:
++ ngx_lua_shrbtree support /lua table/,
++ there are no expiration time, replacement strategy.
+
+In effect, It is storage with red-black tree structure.
+
+* Directive
+*syntax:*  /ngx_shared_rbtree <name> <size>/
+
+*default:* /no/
+
+*context:* /http/
+
+*phase:*   /depends on usage/
+
+Declares a shared memory zone, =<name>=, to serve as storage for the shm based
+Lua shared rbtree.
+
+Shared memory zones are always shared by all the nginx worker processes in the
+current nginx server instance.
+
+The =<size>= argument accepts size units such as =k= and =m=:
+
+#+BEGIN_SRC nginx
+http {
+    lua_shared_rbtree rbtree 1m;
+    ...
+}
+#+END_SRC
+
+* Installation
+
+[[https://github.com/openresty/lua-nginx-module#installation][Seeing lua-nginx-module installation]],
+and on this basis you just need to add *ngx-lua-shrbtree-module*.
+
+#+BEGIN_SRC shell
+./configure ${lua-nginx-module configure arguments}
+            --add-module=/path/to/ngx-lua-shrbtree-module
+
+make && make install
+#+END_SRC
+
+* Lua APIs
+
+*context:* /set_by_lua*, rewrite_by_lua*, access_by_lua*, content_by_lua*, header_filter_by_lua*, body_filter_by_lua*, log_by_lua*, ngx.timer.*/
+
+*support type:* =boolean, number, string, table=
+
+** insert
+*syntax:* =success, message = insert {key , value , compare_function}=
+
+*arguments:*
++ =key=: key of insert node.
++ =value=: value of insert node.
++ =compare_function=: a function to compare two keys.
+
+*return:*
++ =success=: boolean value to indicate whether the node is stored or not.
++ =message=: textual error message, e.g. "no memory".
+
+** get
+*syntax:* =value, message = get {key [, field] , compare_function}=
+
+*arguments:*
++ =key=: key of want to get node.
++ =field=: Optional, key of table that if the value is table type.
++ =compare_function=: a function to compare two keys.
+
+*return:*
++ =value=: value of get by key and optional field. If it's =nil=,
+  indicate /get false/, and the error message in =message=.
++ =message=: textual error message, e.g. "no exists".
+
+** delete
+*syntax:* =success, message = delete {key , compare_function}=
+
+*arguments:*
++ =key=: key of delete node.
++ =compare_function=: a function to compare two keys.
+
+*return:*
++ =success=: boolean value to indicate whether the node is delete or not.
++ =message=: textual error message, e.g. "no exists".
+
+** compare_function
+Convention of the compare function:
+*syntax:* =result = compare_function(key1, key2)=
++ =key1=: Key of current rbtree node that is =key= argument of APIs.
++ =key2=: Key of other rbtree node that is given by APIs.
++ =result=: It indicates =key1 > key2= that is =1=.
+            It indicates =key1 < key2= that is =-1=.
+            It indicates =key1 == key2= that is =0=.
+
+* Example
+
+Here is a simple example:
+#+BEGIN_SRC nginx
+http {
+    lua_shared_rbtree rbtree 1m;
+    server {
+        location /test {
+            content_by_lua '
+                -- require shrbtree module
+                local shrbtree = require("shrbtree")
+                local rbtree = shrbtree.rbtree
+
+                -- compare function
+                local cmp = function(s1, s2)
+                    if s1 > s2 then
+                        return 1
+
+                    elseif s1 < s2 then
+                        return -1
+
+                    else
+                        return 0
+                    end 
+                end
+
+                local success, msg = rbtree:insert{"a", 1, cmp}
+                if not success then
+                    return ngx.say(msg)
+                end
+
+                local value, msg = rbtree:get{"a", cmp}
+                if value == nil then
+                    return ngx.say(msg)
+                end
+
+                ngx.say(value)
+            ';
+        }
+    }
+}
+#+END_SRC
+
+Here is a example that /ip2location/ info test:
+#+BEGIN_SRC nginx
+http {
+    lua_shared_rbtree rbtree 100m;
+    server {
+        location /insert_ipinfo {
+            content_by_lua_file path/to/insert_ipinfo.lua;
+        }
+        
+        location /get_ipinfo {
+            content_by_lua_file path/to/get_ipinfo.lua;
+        }
+    }
+}
+#+END_SRC
+
+#+BEGIN_SRC lua
+local shrbtree = require("shrbtree")
+local rbtree = shrbtree.rbtree
+
+local cmpf = function(a, b)
+  if a[1] > b[2] then
+    return 1
+
+  elseif a[1] < b[1] then
+    return -1
+
+  else
+    return 0
+  end
+end
+
+local filename = "path/to/IP2LOCATION-LITE-DB1.CSV"
+local pattern = '"(%d+)","(%d+)","(%a+)","(%a+)"'
+for line in io.lines(filename) do
+  local ok, _, S, E, c, C = string.find(line, pattern)
+
+  local nS = tonumber(S)
+  local nE = tonumber(E)
+
+  if ok then
+    local key = {nS, nE}
+    local value = {c, C}
+    local ok, msg = rbtree:insert{key, value, cmpf}
+    if not ok then
+      ngx.say(nS, " ", nE, " ", c, " ", C)
+      ngx.say(msg)
+    end
+  end
+end
+ngx.say("ok")
+#+END_SRC
+
+#+BEGIN_SRC lua
+local shrbtree = require("shrbtree")
+local rbtree = shrbtree.rbtree
+
+local cmpf = function(a, b)
+    if a > b[2] then
+        return 1
+
+    elseif a < b[1] then
+        return -2
+
+    else
+        return 0
+    end
+end
+
+local filename = "path/to/IP2LOCATION-LITE-DB1.CSV"
+local pattern = '"(%d+)","(%d+)","(%a+)","(%a+)"'
+for line in io.lines(filename) do
+  local ok, _, S, _, _, C = string.find(line, pattern)
+
+  local nS = tonumber(S)
+
+  if ok then
+    local key = nS
+    local value, msg = rbtree:get{key, 2, cmpf}
+    if not (value == C) then
+      ngx.say(nS)
+      ngx.say(msg)
+    end
+  end
+end
+ngx.say("ok")
+#+END_SRC
+
+#+BEGIN_SRC shell
+$ head IP2LOCATION-LITE-DB1.CSV
+"0","16777215","-","-"
+"16777216","16777471","AU","Australia"
+"16777472","16778239","CN","China"
+"16778240","16779263","AU","Australia"
+"16779264","16781311","CN","China"
+#+END_SRC
