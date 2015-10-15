@@ -147,8 +147,10 @@ ngx_http_lua_shared_rbtree(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ctx->main_conf = lsmcf;
     ctx->log = &cf->cycle->new_log;
 
-    zone = ngx_http_lua_shared_memory_add(cf, &name, (size_t) size,
-                                          &ngx_http_lua_shrbtree_module);
+    /* zone = ngx_http_lua_shared_memory_add(cf, &name, (size_t) size, */
+                                          /* &ngx_http_lua_shrbtree_module); */
+    zone = ngx_shared_memory_add(cf, &name, (size_t) size,
+                                 &ngx_http_lua_shrbtree_module);
     if (zone == NULL) {
         return NGX_CONF_ERROR;
     }
