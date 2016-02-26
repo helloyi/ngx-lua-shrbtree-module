@@ -1,4 +1,4 @@
-if echo $HTTP_AUX_FILTER_MODULES | grep " ngx_http_lua_module" > /dev/null; then
+if echo $HTTP_AUX_FILTER_MODULES | grep "ngx_http_lua_module" > /dev/null; then
     echo "found ngx_http_lua_module for ngx_http_lua_rbtree; looks good."
 else
     echo "error: ngx_http_lua_module is required to build ngx_http_lua_rbtree;\
